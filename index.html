@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 10px; }
+    #resultado { font-size: 22px; font-weight: bold; padding: 20px; margin-top: 15px; border-radius: 8px; min-height: 30px; }
+    .confirmado { background: #c8e6c9; color: #2e7d32; }
+    .ja_confirmado { background: #fff3cd; color: #856404; }
+    .nao_encontrado { background: #f8d7da; color: #721c24; }
+  </style>
+</head>
+<body>
+  <h2>CHECK-IN TENDA DO ENCONTRO 2026</h2>
+  <div id="reader" style="width: 100%; max-width: 400px; margin: 0 auto;"></div>
+  <div id="resultado"></div>
+
+  <script>
+    // TROQUE a URL abaixo pela URL do seu Web App do Apps Script (termina em /exec)
+    var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbymzfp_AyRaJuq7tkosWZrCG2kh5zyjMWn_1bml4B0LuCa16XFI4-Svdpp-80D3y2Rrqw/exec";
+
+    var processando = false;
+
+    function onScanSuccess(id) {
+      if (processando) return;
+      processando = true;
+      var div = document.getElementById('resultado');
+      div.innerText = 'Verificando...';
+      div.className = '';
+
+      fetch(APPS_SCRIPT_URL + '?id=' + encodeURIComponent(id))
+        .then(function(resp) { return resp.json(); })
+        .then(function(resp) {
+          if (resp.resultado === 'confirmado') {
+            div.innerText = '✅ Confirmado - ' + resp.nome;
+            div.className = 'confirmado';
+          } else if (resp.resultado === 'ja_confirmado') {
+            div.innerText = '⚠️ Já confirmado às ' + resp.hora + ' - ' + resp.nome;
+            div.className = 'ja_confirmado';
+          } else {
+            div.innerText = '❌ Não encontrado: ' + id;
+            div.className = 'nao_encontrado';
+          }
+          setTimeout(function(){ processando = false; }, 2000);
+        })
+        .catch(function(err) {
+          div.innerText = 'Erro de conexão: ' + err;
+          processando = false;
+        });
+    }
+
+    var scanner = new Html5Qrcode("reader");
+    scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 250 },
+      onScanSuccess
+    ).catch(function(err) {
+      document.getElementById('resultado').innerText = 'Erro câmera: ' + err;
+    });
+  </script>
+</body>
+</html>
