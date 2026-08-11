@@ -11,20 +11,103 @@
     .confirmado { background: #c8e6c9; color: #2e7d32; }
     .ja_confirmado { background: #fff3cd; color: #856404; }
     .nao_encontrado { background: #f8d7da; color: #721c24; }
+    .btn-opcao {
+      font-size: 18px; padding: 14px 22px; margin: 6px; border-radius: 8px;
+      border: 2px solid #ccc; background: #f5f5f5; cursor: pointer; display: inline-block;
+    }
+    #telaScanner, #telaTurno { display: none; }
   </style>
 </head>
 <body>
   <h2>CHECK-IN TENDA DO ENCONTRO 2026</h2>
-  <div id="reader" style="width: 100%; max-width: 400px; margin: 0 auto;"></div>
-  <div id="resultado"></div>
+
+  <div id="telaDia">
+    <p><strong>Selecione o dia do evento:</strong></p>
+    <button class="btn-opcao" onclick="selecionarDia(1)">Dia 1</button>
+    <button class="btn-opcao" onclick="selecionarDia(2)">Dia 2</button>
+    <button class="btn-opcao" onclick="selecionarDia(3)">Dia 3</button>
+  </div>
+
+  <div id="telaTurno">
+    <p id="diaEscolhidoLabel" style="font-weight: bold;"></p>
+    <p><strong>Selecione o turno:</strong></p>
+    <div id="botoesTurno"></div>
+    <p><button onclick="voltarParaDia()" style="margin-top: 10px; padding: 6px 14px;">Voltar</button></p>
+  </div>
+
+  <div id="telaScanner">
+    <p id="slotAtualLabel" style="font-weight: bold; font-size: 18px;"></p>
+    <div id="reader" style="width: 100%; max-width: 400px; margin: 0 auto;"></div>
+    <div id="resultado"></div>
+    <p><button onclick="voltarParaTurno()" style="margin-top: 15px; padding: 8px 16px;">Trocar turno</button></p>
+  </div>
 
   <script>
     var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx7p9aD2mELjRehfgg8CUr2dW4C64d6wuisqRgzd66bfQ0RHXj_1qdU_jCxyBF7HTQaZA/exec";
 
     var processando = false;
     var jsonpCounter = 0;
+    var diaSelecionado = null;
+    var slotSelecionado = null;
+    var scanner = null;
 
-    function verificarCheckinJSONP(id) {
+    var turnosPorDia = {
+      1: [ ["M", "Manhã"], ["T", "Tarde"], ["N", "Noite"] ],
+      2: [ ["M", "Manhã"], ["T", "Tarde"], ["N", "Noite"] ],
+      3: [ ["M", "Manhã"], ["T", "Tarde"] ]
+    };
+
+    function selecionarDia(dia) {
+      diaSelecionado = dia;
+      document.getElementById('telaDia').style.display = 'none';
+      document.getElementById('telaTurno').style.display = 'block';
+      document.getElementById('diaEscolhidoLabel').innerText = 'Dia ' + dia;
+
+      var container = document.getElementById('botoesTurno');
+      container.innerHTML = '';
+      turnosPorDia[dia].forEach(function(t) {
+        var btn = document.createElement('button');
+        btn.className = 'btn-opcao';
+        btn.innerText = t[1];
+        btn.onclick = function() { selecionarTurno(t[0], t[1]); };
+        container.appendChild(btn);
+      });
+    }
+
+    function selecionarTurno(codigoTurno, nomeTurno) {
+      slotSelecionado = diaSelecionado + codigoTurno;
+      document.getElementById('telaTurno').style.display = 'none';
+      document.getElementById('telaScanner').style.display = 'block';
+      document.getElementById('slotAtualLabel').innerText = 'Dia ' + diaSelecionado + ' - ' + nomeTurno;
+      document.getElementById('resultado').innerText = '';
+      document.getElementById('resultado').className = '';
+
+      if (!scanner) {
+        scanner = new Html5Qrcode("reader");
+      }
+      scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        onScanSuccess
+      ).catch(function(err) {
+        document.getElementById('resultado').innerText = 'Erro câmera: ' + err;
+      });
+    }
+
+    function voltarParaDia() {
+      document.getElementById('telaTurno').style.display = 'none';
+      document.getElementById('telaDia').style.display = 'block';
+    }
+
+    function voltarParaTurno() {
+      if (scanner) {
+        scanner.stop().catch(function(){});
+      }
+      document.getElementById('telaScanner').style.display = 'none';
+      document.getElementById('telaTurno').style.display = 'block';
+    }
+
+    function verificarCheckinJSONP(id, slot) {
       return new Promise(function(resolve, reject) {
         var callbackName = 'jsonpCallback_' + (jsonpCounter++);
         var script = document.createElement('script');
@@ -41,7 +124,7 @@
           if (script.parentNode) document.body.removeChild(script);
         };
 
-        script.src = APPS_SCRIPT_URL + '?id=' + encodeURIComponent(id) + '&callback=' + callbackName;
+        script.src = APPS_SCRIPT_URL + '?id=' + encodeURIComponent(id) + '&slot=' + slot + '&callback=' + callbackName;
         document.body.appendChild(script);
 
         setTimeout(function() {
@@ -61,7 +144,7 @@
       div.innerText = 'Verificando...';
       div.className = '';
 
-      verificarCheckinJSONP(id).then(function(resp) {
+      verificarCheckinJSONP(id, slotSelecionado).then(function(resp) {
         if (resp.resultado === 'confirmado') {
           div.innerText = '✅ Confirmado - ' + resp.nome;
           div.className = 'confirmado';
@@ -78,15 +161,6 @@
         processando = false;
       });
     }
-
-    var scanner = new Html5Qrcode("reader");
-    scanner.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: 250 },
-      onScanSuccess
-    ).catch(function(err) {
-      document.getElementById('resultado').innerText = 'Erro câmera: ' + err;
-    });
   </script>
 </body>
 </html>
